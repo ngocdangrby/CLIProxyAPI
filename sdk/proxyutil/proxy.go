@@ -3,10 +3,12 @@ package proxyutil
 import (
 	"context"
 	"fmt"
+	mrand "math/rand/v2"
 	"net"
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 
 	"golang.org/x/net/proxy"
 )
@@ -121,7 +123,100 @@ func BuildHTTPTransport(raw string) (*http.Transport, Mode, error) {
 	}
 }
 
-// BuildDialer constructs a proxy dialer for settings that operate at the connection layer.
+// RoundRobinProxy is a proxy selector that cycles through a list of proxy URLs.
+// It supports "direct" (no proxy) as one of the options in the rotation.
+type RoundRobinProxy struct {
+	proxies []string
+	mu      sync.Mutex
+	cursor  int
+}
+
+// NewRoundRobinProxy creates a new round-robin proxy selector from a "||"-separated string.
+// If includeNoProxy is true, "direct" is appended as the last option in the rotation.
+func NewRoundRobinProxy(rawList string, includeNoProxy bool) (*RoundRobinProxy, error) {
+	rawList = strings.TrimSpace(rawList)
+	if rawList == "" {
+		return nil, fmt.Errorf("proxy list is empty")
+	}
+
+	parts := strings.Split(rawList, "||")
+	proxies := make([]string, 0, len(parts)+1) // +1 for optional "direct"
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		// Validate each proxy
+		if _, err := Parse(p); err != nil {
+			return nil, fmt.Errorf("invalid proxy in list: %s: %w", p, err)
+		}
+		proxies = append(proxies, p)
+	}
+
+	if len(proxies) == 0 {
+		return nil, fmt.Errorf("no valid proxies in list")
+	}
+
+	rr := &RoundRobinProxy{
+		proxies: proxies,
+		cursor:  0,
+	}
+
+	if includeNoProxy {
+		rr.proxies = append(rr.proxies, "direct")
+	}
+
+	// Shuffle initial cursor to randomize starting point
+	rr.cursor = mrand.IntN(len(rr.proxies))
+
+	return rr, nil
+}
+
+// Next returns the next proxy URL in the rotation.
+func (r *RoundRobinProxy) Next() string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	idx := r.cursor
+	r.cursor = (r.cursor + 1) % len(r.proxies)
+	return r.proxies[idx]
+}
+
+// BuildHTTPTransportWithRoundRobin builds an HTTP transport using a round-robin proxy selector.
+func BuildHTTPTransportWithRoundRobin(rawList string, includeNoProxy bool) (*http.Transport, *RoundRobinProxy, error) {
+	rr, err := NewRoundRobinProxy(rawList, includeNoProxy)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Get first proxy to build initial transport
+	proxyURL := rr.Next()
+	transport, mode, err := BuildHTTPTransport(proxyURL)
+	if err != nil {
+		return nil, rr, err
+	}
+	// If first proxy is direct, mode will be ModeDirect
+	_ = mode
+
+	return transport, rr, nil
+}
+
+// BuildDialerWithRoundRobin constructs a proxy dialer using a round-robin proxy selector.
+func BuildDialerWithRoundRobin(rawList string, includeNoProxy bool) (proxy.Dialer, *RoundRobinProxy, error) {
+	rr, err := NewRoundRobinProxy(rawList, includeNoProxy)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	proxyURL := rr.Next()
+	dialer, mode, err := BuildDialer(proxyURL)
+	if err != nil {
+		return nil, rr, err
+	}
+	_ = mode
+
+	return dialer, rr, nil
+}
 func BuildDialer(raw string) (proxy.Dialer, Mode, error) {
 	setting, errParse := Parse(raw)
 	if errParse != nil {

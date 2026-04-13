@@ -159,3 +159,116 @@ func TestBuildHTTPTransportSOCKS5HProxy(t *testing.T) {
 		t.Fatal("expected SOCKS5H transport to have custom DialContext")
 	}
 }
+
+func TestNewRoundRobinProxy(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		rawList       string
+		includeNoProxy bool
+		wantCount     int
+		wantErr       bool
+	}{
+		{
+			name:      "two proxies",
+			rawList:   "socks5://proxy1:1080||http://proxy2:8080",
+			wantCount: 2,
+			wantErr:   false,
+		},
+		{
+			name:      "three proxies with spaces",
+			rawList:   "  socks5://proxy1:1080  ||  http://proxy2:8080  ||  https://proxy3:8443  ",
+			wantCount: 3,
+			wantErr:   false,
+		},
+		{
+			name:          "three proxies with no proxy",
+			rawList:       "socks5://proxy1:1080||http://proxy2:8080||direct",
+			includeNoProxy: true,
+			wantCount:     4, // 3 proxies + direct
+			wantErr:       false,
+		},
+		{
+			name:      "invalid proxy in list",
+			rawList:   "socks5://proxy1:1080||invalid-url",
+			wantCount: 0,
+			wantErr:   true,
+		},
+		{
+			name:      "empty string",
+			rawList:   "",
+			wantCount: 0,
+			wantErr:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			rr, err := NewRoundRobinProxy(tt.rawList, tt.includeNoProxy)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if len(rr.proxies) != tt.wantCount {
+				t.Fatalf("proxy count = %d, want %d", len(rr.proxies), tt.wantCount)
+			}
+		})
+	}
+}
+
+func TestRoundRobinProxyNext(t *testing.T) {
+	t.Parallel()
+
+	rr, err := NewRoundRobinProxy("socks5://proxy1:1080||http://proxy2:8080||https://proxy3:8443", false)
+	if err != nil {
+		t.Fatalf("NewRoundRobinProxy returned error: %v", err)
+	}
+
+	seen := make(map[string]bool)
+	// Call Next() multiple times and verify we cycle through all proxies
+	for i := 0; i < 10; i++ {
+		proxy := rr.Next()
+		if proxy == "" {
+			t.Fatal("Next() returned empty string")
+		}
+		seen[proxy] = true
+	}
+
+	// Should have seen all 3 proxies
+	if len(seen) != 3 {
+		t.Fatalf("expected 3 different proxies seen, got %d: %v", len(seen), seen)
+	}
+}
+
+func TestRoundRobinProxyNextWithNoProxy(t *testing.T) {
+	t.Parallel()
+
+	rr, err := NewRoundRobinProxy("socks5://proxy1:1080||http://proxy2:8080", true)
+	if err != nil {
+		t.Fatalf("NewRoundRobinProxy returned error: %v", err)
+	}
+
+	seen := make(map[string]bool)
+	// Call Next() multiple times and verify we cycle through all proxies including direct
+	for i := 0; i < 12; i++ {
+		proxy := rr.Next()
+		seen[proxy] = true
+	}
+
+	// Should have seen all 3 proxies (2 proxies + direct)
+	if len(seen) != 3 {
+		t.Fatalf("expected 3 different proxies seen (2 + direct), got %d: %v", len(seen), seen)
+	}
+	if !seen["direct"] {
+		t.Fatal("expected 'direct' to be in rotation")
+	}
+}

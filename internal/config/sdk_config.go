@@ -9,6 +9,15 @@ type SDKConfig struct {
 	// ProxyURL is the URL of an optional proxy server to use for outbound requests.
 	ProxyURL string `yaml:"proxy-url" json:"proxy-url"`
 
+	// ProxyURLs is a list of proxy URLs separated by "||" for round-robin proxy selection.
+	// When configured, requests will cycle through each proxy in order.
+	// Example: "socks5://proxy1:1080||socks5://proxy2:1080||direct"
+	ProxyURLs string `yaml:"proxy-urls" json:"proxy-urls"`
+
+	// ProxyRoundRobinIncludeNoProxy when true, includes a "no proxy" (direct connection)
+	// option in the round-robin pool. When false, only the configured proxies are used.
+	ProxyRoundRobinIncludeNoProxy bool `yaml:"proxy-round-robin-include-no-proxy" json:"proxy-round-robin-include-no-proxy"`
+
 	// EnableGeminiCLIEndpoint controls whether Gemini CLI internal endpoints (/v1internal:*) are enabled.
 	// Default is false for safety; when false, /v1internal:* requests are rejected.
 	EnableGeminiCLIEndpoint bool `yaml:"enable-gemini-cli-endpoint" json:"enable-gemini-cli-endpoint"`
