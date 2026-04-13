@@ -525,6 +525,15 @@ func (s *Server) registerManagementRoutes() {
 		mgmt.PATCH("/proxy-url", s.mgmt.PutProxyURL)
 		mgmt.DELETE("/proxy-url", s.mgmt.DeleteProxyURL)
 
+		mgmt.GET("/proxy-urls", s.mgmt.GetProxyURLs)
+		mgmt.PUT("/proxy-urls", s.mgmt.PutProxyURLs)
+		mgmt.PATCH("/proxy-urls", s.mgmt.PutProxyURLs)
+		mgmt.DELETE("/proxy-urls", s.mgmt.DeleteProxyURLs)
+
+		mgmt.GET("/proxy-round-robin-include-no-proxy", s.mgmt.GetProxyRoundRobinIncludeNoProxy)
+		mgmt.PUT("/proxy-round-robin-include-no-proxy", s.mgmt.PutProxyRoundRobinIncludeNoProxy)
+		mgmt.PATCH("/proxy-round-robin-include-no-proxy", s.mgmt.PutProxyRoundRobinIncludeNoProxy)
+
 		mgmt.POST("/api-call", s.mgmt.APICall)
 
 		mgmt.GET("/quota-exceeded/switch-project", s.mgmt.GetSwitchProject)

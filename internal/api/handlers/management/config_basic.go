@@ -326,3 +326,21 @@ func (h *Handler) DeleteProxyURL(c *gin.Context) {
 	h.cfg.ProxyURL = ""
 	h.persist(c)
 }
+
+// Proxy URLs (Round Robin)
+func (h *Handler) GetProxyURLs(c *gin.Context) { c.JSON(200, gin.H{"proxy-urls": h.cfg.ProxyURLs}) }
+func (h *Handler) PutProxyURLs(c *gin.Context) {
+	h.updateStringField(c, func(v string) { h.cfg.ProxyURLs = v })
+}
+func (h *Handler) DeleteProxyURLs(c *gin.Context) {
+	h.cfg.ProxyURLs = ""
+	h.persist(c)
+}
+
+// ProxyRoundRobinIncludeNoProxy
+func (h *Handler) GetProxyRoundRobinIncludeNoProxy(c *gin.Context) {
+	c.JSON(200, gin.H{"proxy-round-robin-include-no-proxy": h.cfg.ProxyRoundRobinIncludeNoProxy})
+}
+func (h *Handler) PutProxyRoundRobinIncludeNoProxy(c *gin.Context) {
+	h.updateBoolField(c, func(v bool) { h.cfg.ProxyRoundRobinIncludeNoProxy = v })
+}
