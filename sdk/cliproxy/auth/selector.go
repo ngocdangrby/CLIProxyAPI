@@ -15,6 +15,7 @@ import (
 
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/thinking"
 	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy/executor"
+	"github.com/sirupsen/logrus"
 )
 
 // RoundRobinSelector provides a simple provider scoped round-robin selection strategy.
@@ -299,7 +300,9 @@ func (s *RoundRobinSelector) Pick(ctx context.Context, provider, model string, o
 		}
 		s.cursors[innerKey] = innerIndex + 1
 		s.mu.Unlock()
-		return group[innerIndex%len(group)], nil
+		picked := group[innerIndex%len(group)]
+		logrus.Debugf("round-robin auth selected: provider=%s model=%s group=%s auth=%s", provider, model, selectedParent, picked.ID)
+		return picked, nil
 	}
 
 	// Flat round-robin for non-grouped auths (original behavior).
@@ -310,7 +313,9 @@ func (s *RoundRobinSelector) Pick(ctx context.Context, provider, model string, o
 	}
 	s.cursors[key] = index + 1
 	s.mu.Unlock()
-	return available[index%len(available)], nil
+	picked := available[index%len(available)]
+	logrus.Debugf("round-robin auth selected: provider=%s model=%s auth=%s", provider, model, picked.ID)
+	return picked, nil
 }
 
 // ensureCursorKey ensures the cursor map has capacity for the given key.

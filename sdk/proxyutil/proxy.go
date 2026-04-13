@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/sirupsen/logrus"
 	"golang.org/x/net/proxy"
 )
 
@@ -179,7 +180,9 @@ func (r *RoundRobinProxy) Next() string {
 
 	idx := r.cursor
 	r.cursor = (r.cursor + 1) % len(r.proxies)
-	return r.proxies[idx]
+	proxyURL := r.proxies[idx]
+	logrus.Debugf("round-robin proxy using: %s", proxyURL)
+	return proxyURL
 }
 
 // BuildHTTPTransportWithRoundRobin builds an HTTP transport using a round-robin proxy selector.

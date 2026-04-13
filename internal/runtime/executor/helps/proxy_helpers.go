@@ -16,8 +16,8 @@ import (
 
 // roundRobinProxyHolder holds a RoundRobinProxy and its mutex for thread-safe access.
 type roundRobinProxyHolder struct {
-	rr  *proxyutil.RoundRobinProxy
-	mu  sync.Mutex
+	rr *proxyutil.RoundRobinProxy
+	mu sync.Mutex
 }
 
 // RoundRobinProxies maps auth ID to its round-robin proxy selector.
@@ -92,7 +92,6 @@ func NewProxyAwareHTTPClient(ctx context.Context, cfg *config.Config, auth *clip
 				log.Debugf("failed to create round-robin proxy: %v", err)
 			} else {
 				nextProxy := rr.Next()
-				log.Debugf("using round-robin proxy: %s", nextProxy)
 				transport := buildProxyTransport(nextProxy)
 				if transport != nil {
 					httpClient.Transport = transport
